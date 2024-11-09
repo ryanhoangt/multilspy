@@ -106,3 +106,27 @@ async def test_multilspy_python_black():
                     },
                 },
             ]
+            
+            # Test document symbols functionality
+            symbols, tree = await lsp.request_document_symbols(str(PurePath("src/black/mode.py")))
+            
+            # Verify flat list of symbols
+            assert isinstance(symbols, list)
+            assert len(symbols) > 0
+            
+            # Check a few known symbols that should be in the file
+            symbol_names = {s["name"] for s in symbols}
+            assert "TargetVersion" in symbol_names
+            assert "Feature" in symbol_names
+            
+            # Verify tree representation
+            assert isinstance(tree, list)
+            assert len(tree) > 0
+            
+            # The tree should contain at least one class-level entry (TargetVersion or Feature)
+            class_entry = next((t for t in tree if 5 in t), None)  # 5 is SymbolKind.Class
+            assert class_entry is not None
+            
+            # The class should have child nodes (methods, fields, etc.)
+            assert isinstance(class_entry[5], list)
+            assert len(class_entry[5]) > 0

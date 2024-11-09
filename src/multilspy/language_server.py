@@ -582,6 +582,7 @@ class LanguageServer:
                     }
                 }
             )
+            self.logger.log(f"Document symbols response: {response}", logging.DEBUG)
         
         ret: List[multilspy_types.UnifiedSymbolInformation] = []
         l_tree = None
@@ -594,17 +595,36 @@ class LanguageServer:
             if LSPConstants.CHILDREN in item:
                 # TODO: l_tree should be a list of TreeRepr. Define the following function to return TreeRepr as well
                 
-                def visit_tree_nodes_and_build_tree_repr(tree: LSPTypes.DocumentSymbol) -> List[multilspy_types.UnifiedSymbolInformation]:
+                def visit_tree_nodes_and_build_tree_repr(tree: LSPTypes.DocumentSymbol) -> Tuple[List[multilspy_types.UnifiedSymbolInformation], multilspy_types.TreeRepr]:
                     l: List[multilspy_types.UnifiedSymbolInformation] = []
+                    tree_repr: multilspy_types.TreeRepr = {}
                     children = tree['children'] if 'children' in tree else []
                     if 'children' in tree:
                         del tree['children']
-                    l.append(multilspy_types.UnifiedSymbolInformation(**tree))
+                    
+                    # Add current node to the flat list
+                    current_symbol = multilspy_types.UnifiedSymbolInformation(**tree)
+                    l.append(current_symbol)
+                    
+                    # Process children recursively
+                    child_trees: List[multilspy_types.TreeRepr] = []
                     for child in children:
-                        l.extend(visit_tree_nodes_and_build_tree_repr(child))
-                    return l
+                        child_symbols, child_tree = visit_tree_nodes_and_build_tree_repr(child)
+                        l.extend(child_symbols)
+                        child_trees.append(child_tree)
+                    
+                    # Build tree representation - use the symbol kind as key
+                    if child_trees:
+                        tree_repr[current_symbol['kind']] = child_trees
+                    
+                    return l, tree_repr
                 
-                ret.extend(visit_tree_nodes_and_build_tree_repr(item))
+                symbols, tree = visit_tree_nodes_and_build_tree_repr(item)
+                ret.extend(symbols)
+                if tree:
+                    if l_tree is None:
+                        l_tree = []
+                    l_tree.append(tree)
             else:
                 ret.append(multilspy_types.UnifiedSymbolInformation(**item))
 
